@@ -1,6 +1,7 @@
 const { VNPay, HashAlgorithm, ProductCode } = require("vnpay");
 const Order = require("../../model/order");
 const renderPaymentResultPage = require("../../utils/renderPaymentResultPage");
+const User = require("../../model/User");
 
 const vnpay = new VNPay({
   // ⚡ Cấu hình bắt buộc
@@ -43,23 +44,53 @@ const VNPayControllers = {
   },
   paymentReturn: async (req, res) => {
     const verified = vnpay.verifyReturnUrl(req.query);
-    if (!verified) {
+    const orderId = req.query.vnp_TxnRef;
+    const responseCode = req.query.vnp_ResponseCode; // Mã phản hồi của VNPay // Tìm đơn hàng
+
+    const order = await Order.findById(orderId);
+    const user = order ? await User.findById(order.userInfo) : null;
+    const cartID = order ? order.cartID : null;
+
+    if (!verified || !order || !user) {
+      // Thậm chí nếu xác thực thất bại, vẫn cố gắng cập nhật trạng thái đơn hàng nếu tìm thấy
+      if (order) {
+        order.paymentStatus = "Thất Bại";
+        await order.save();
+      }
       return res.send(
         renderPaymentResultPage({
           success: false,
-          errorCode: "Xác thực thất bại",
+          errorCode: "Xác thực thất bại/Không tìm thấy đơn hàng",
         })
       );
-    }
-    const orderId = req.query.vnp_TxnRef;
-    if (req.query.vnp_ResponseCode === "00") {
-      // Cập nhật trạng thái đơn hàng tại đây nếu cần
+    } // Nếu thanh toán thành công
+    if (responseCode === "00") {
+      // Kiểm tra tránh xử lý trùng lặp
+      if (order.paymentStatus === "Đang Chờ") {
+        try {
+          // 1. Xử lý thành công đơn hàng (trừ điểm, cộng thưởng, giảm kho/voucher)
+          // *Gọi hàm processOrderSuccess đã định nghĩa ở trên (bạn cần import)
+          await processOrderSuccess(order, user); // 2. Cập nhật trạng thái
+          order.paymentStatus = "Thành Công";
+          order.orderStatus = "Đã Xác Nhận"; // Chuyển sang đã xác nhận vì đã thanh toán
+          await order.save(); // 3. Xóa giỏ hàng
+          await Cart.findByIdAndDelete(cartID);
+        } catch (error) {
+          console.error("Lỗi xử lý điểm/kho sau VNPay:", error); // Có thể log lỗi nhưng vẫn trả về thành công cho người dùng
+        }
+      } // Trả về trang thông báo
       return res.send(renderPaymentResultPage({ success: true, orderId }));
     } else {
+      // Thanh toán thất bại (vnp_ResponseCode !== "00")
+      if (order.paymentStatus === "Đang Chờ") {
+        order.paymentStatus = "Thất Bại";
+        order.orderStatus = "Đã Hủy"; // Đơn hàng bị hủy nếu thanh toán thất bại
+        await order.save();
+      }
       return res.send(
         renderPaymentResultPage({
           success: false,
-          errorCode: req.query.vnp_ResponseCode,
+          errorCode: responseCode,
         })
       );
     }

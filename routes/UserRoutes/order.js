@@ -12,6 +12,9 @@ router.get("/getCreateBy", verifyToken, orderControllers.getCreateByUser);
 // get OderID
 router.get("/:id", verifyToken, orderControllers.getDetailOrder);
 
+//confirm_Received
+router.patch("/:id", verifyToken, orderControllers.confirm_Received);
+
 //Update Order
 router.patch("/:id", verifyToken, orderControllers.updateOrder);
 

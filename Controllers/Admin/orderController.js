@@ -5,7 +5,7 @@ const Product = require("../../model/product");
 const orderController = {
   createOder: async (req, res) => {
     const cartID = req.params.id;
-    const { address, username_Receive, phoneNumber, paymentStatus } = req.body;
+    const { address, username_Receive, phoneNumber, paymentMethod } = req.body;
     const checkCartID = await Cart.findById(cartID).populate(
       "products.product"
     );
@@ -16,7 +16,7 @@ const orderController = {
       });
     }
     try {
-      if (!address || !username_Receive || !phoneNumber || !paymentStatus) {
+      if (!address || !username_Receive || !phoneNumber || !paymentMethod) {
         return res
           .status(401)
           .json({ success: false, message: "Vui lòng điền đầy đủ thông tin" });
@@ -37,7 +37,7 @@ const orderController = {
         address: address,
         phoneNumber: phoneNumber,
         orderStatus: "Chưa Xác Nhận",
-        paymentStatus: paymentStatus,
+        paymentMethod: paymentMethod,
         products: checkCartID.products.map((item) => ({
           product: item.product._id,
           quantity: item.quantity,
@@ -184,7 +184,7 @@ const orderController = {
 
   confirm_Order: async (req, res) => {
     const orderID = req.params.id;
-    const { orderStatus, paymentStatus } = req.body;
+    const { orderStatus, paymentMethod } = req.body;
     try {
       const checkOrderID = await Order.findById(orderID);
       if (!checkOrderID) {
@@ -203,7 +203,7 @@ const orderController = {
         orderID,
         {
           orderStatus: orderStatus,
-          paymentStatus: paymentStatus,
+          paymentMethod: paymentMethod,
           expectedDeliveryAt,
         },
         { new: true }
@@ -232,7 +232,7 @@ const orderController = {
       checkOrder.deletedAt = new Date();
       checkOrder.isDeleted = true;
       checkOrder.orderStatus = "Đã Hủy";
-      checkOrder.paymentStatus = "Thất Bại";
+      checkOrder.paymentMethod = "Thất Bại";
       await checkOrder.save();
       return res
         .status(200)

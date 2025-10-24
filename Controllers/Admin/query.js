@@ -50,7 +50,7 @@ const getDashboardStart = async (req, res) => {
           createdAt: { $gte: startOfMonth, $lte: endOfMonth },
           $or: [
             { orderStatus: "Hoàn Thành" },
-            { paymentStatus: "Thanh Toán Online" },
+            { paymentMethod: "Thanh Toán Online" },
           ],
         },
       },
@@ -123,7 +123,7 @@ const getDashboardStart = async (req, res) => {
           createdAt: { $gte: startPrev, $lte: endPrev },
           $or: [
             { orderStatus: "Hoàn Thành" },
-            { paymentStatus: "Thanh Toán Online" },
+            { paymentMethod: "Thanh Toán Online" },
           ],
         },
       },
@@ -180,7 +180,7 @@ const getDailyData = async (req, res) => {
           isDeleted: false,
           $or: [
             { orderStatus: "Hoàn Thành" },
-            { paymentStatus: "Thanh Toán Online" },
+            { paymentMethod: "Thanh Toán Online" },
           ],
         },
       },
@@ -195,7 +195,7 @@ const getDailyData = async (req, res) => {
           isDeleted: false,
           $or: [
             { orderStatus: "Hoàn Thành" },
-            { paymentStatus: "Thanh Toán Online" },
+            { paymentMethod: "Thanh Toán Online" },
           ],
         },
       },

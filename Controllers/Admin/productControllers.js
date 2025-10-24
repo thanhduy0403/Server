@@ -122,7 +122,9 @@ const productControllers = {
           .status(403)
           .json({ success: false, message: "Không tìm thấy sản phẩm" });
       }
-      return res.json(getOne);
+      return res
+        .status(200)
+        .json({ success: true, message: "Chi tiết sản phẩm", getOne });
     } catch (error) {
       res.status(500).json({ success: false, message: "Lỗi Params" });
     }

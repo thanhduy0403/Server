@@ -71,9 +71,20 @@ const orderSchema = new Schema({
   expectedDeliveryAt: {
     type: Date,
   },
-  paymentStatus: {
+  paymentMethod: {
     type: String,
     enum: ["Thanh Toán Khi Nhận Hàng", "Thanh Toán Online", "Thất Bại"],
+  },
+  receivedStatus: {
+    type: String,
+    enum: ["Chưa Nhận", "Đã Nhận"],
+    default: "Chưa Nhận",
+  },
+  // 🔹 Trạng thái thanh toán (mới thêm)
+  paymentStatus: {
+    type: String,
+    enum: ["Đang Chờ", "Thành Công", "Thất Bại", "Hoàn Tiền"],
+    default: "Đang Chờ",
   },
   totalPriceProduct: { type: Number, required: true },
   // các trường liên quan voucher
@@ -83,6 +94,10 @@ const orderSchema = new Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Voucher",
     default: null,
+  },
+  pointsUser: {
+    type: Number,
+    default: 0,
   },
 });
 

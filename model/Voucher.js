@@ -23,6 +23,15 @@ const voucherSchema = new Schema(
       type: Number,
       default: null, // Giảm tối đa bao nhiêu tiền
     },
+    expiryDate: {
+      type: Date,
+      required: true, // ngày hết hạn của voucher
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1, // số lượng tối thiểu giảm
+    },
   },
   { timestamps: true }
 );

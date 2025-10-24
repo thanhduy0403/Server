@@ -8,7 +8,7 @@ const replySchema = mongoose.Schema(
     },
     accountID: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Account",
+      ref: "Account", // dành cho admin
     },
     guestName: {
       type: String,
@@ -16,7 +16,8 @@ const replySchema = mongoose.Schema(
         return !this.userID && !this.accountID;
       },
     },
-    content: {
+
+    replyText: {
       type: String,
       trim: true,
       required: true,
@@ -24,6 +25,10 @@ const replySchema = mongoose.Schema(
     isOfficialAnswer: {
       type: Boolean,
       default: false, // Admin có thể đánh dấu đây là câu trả lời chính thức
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
     },
   },
   { timestamps: true }
@@ -40,17 +45,19 @@ const commentSchema = mongoose.Schema(
     userID: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: function () {
+        return !this.guestName;
+      },
     },
     // dành cho khách --> lưu tên khách tại đây (chưa đăng nhập)
     guestName: {
       type: String,
-      trim: true,
       required: function () {
-        return !this.user; // bắt buộc nếu không có user
+        return !this.userID;
       },
     },
-    content: {
+
+    question: {
       type: String,
       required: true,
       trim: true,
@@ -60,6 +67,10 @@ const commentSchema = mongoose.Schema(
       type: String,
       enum: ["pending", "answered", "closed"],
       default: "pending",
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
     },
   },
   { timestamps: true }

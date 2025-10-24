@@ -141,13 +141,18 @@ const categoryControllers = {
   deleteCategory: async (req, res) => {
     const idCategory = req.params.id;
     try {
-      const deleteItem = await Category.findByIdAndDelete(idCategory);
+      const deleteItem = await Category.findById(idCategory);
       if (!deleteItem) {
         return res
           .status(401)
           .json({ success: false, message: "Danh mục sản phẩm không tồn tại" });
       }
-
+      if (deleteItem.products && deleteItem.products.length > 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Bạn không thể xóa danh mục này" });
+      }
+      await Category.findByIdAndDelete(idCategory);
       return res
         .status(200)
         .json({ success: true, message: "Xóa danh mục sản phẩm thành công" });

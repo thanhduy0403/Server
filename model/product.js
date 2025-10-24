@@ -50,6 +50,16 @@ const productSchema = new Schema({
     ref: "Category",
     required: true,
   },
+  ratingSummary: {
+    totalRating: { type: Number, default: 0 },
+    startCounts: {
+      1: { type: Number, default: 0 },
+      2: { type: Number, default: 0 },
+      3: { type: Number, default: 0 },
+      4: { type: Number, default: 0 },
+      5: { type: Number, default: 0 },
+    },
+  },
 });
 productSchema.virtual("amount").get(function () {
   if (!Array.isArray(this.sizes)) return 0;

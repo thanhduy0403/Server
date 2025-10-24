@@ -54,6 +54,29 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+// check comment
+const protect = async (req, res, next) => {
+  let token;
+
+  if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  } else if (req.headers.authorization?.startsWith("Bearer")) {
+    token = req.headers.authorization.split(" ")[1];
+  }
+
+  if (!token) return next(); // Cho phép guest
+
+  try {
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const user = await User.findById(decoded.id);
+    if (user) req.user = user;
+  } catch (error) {
+    console.error("Auth error:", error);
+  }
+
+  next();
+};
+
 // phân quyền riêng cho admin
 const verifyTokenAdmin = (req, res, next) => {
   verifyToken(req, res, () => {
@@ -163,6 +186,7 @@ const checkPermission = async (req, res, next) => {
 };
 
 module.exports = {
+  protect,
   checkPermission,
   verifyToken,
   verifyTokenAdmin,

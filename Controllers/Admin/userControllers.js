@@ -232,6 +232,7 @@ const userControllers = {
           .json({ success: false, message: "Không tìm thấy người dùng" });
       } else {
         user.status = "Đã xóa";
+        user.isDelete = true;
         await user.save();
         return res
           .status(200)

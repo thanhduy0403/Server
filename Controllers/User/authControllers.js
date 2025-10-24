@@ -68,6 +68,12 @@ const authControllers = {
           .status(403)
           .json({ success: false, message: "Email không tồn tại" });
       }
+      if (checkUser.isDelete === true) {
+        return res.status(403).json({
+          success: false,
+          message: "Tài khoản của bạn không thể đăng nhập được",
+        });
+      }
       const checkPassword = await bcrypt.compare(password, checkUser.password);
       if (!checkPassword) {
         return res
@@ -134,6 +140,28 @@ const authControllers = {
     }
   },
 
+  // delete user
+  deleteUser: async (req, res) => {
+    const userID = req.params.id;
+    try {
+      const user = await User.findById(userID);
+      if (!user) {
+        return res
+          .status(403)
+          .json({ success: false, message: "Không tìm thấy tài khoản" });
+      }
+      user.status = "Đã xóa";
+      user.isDelete = true;
+      await user.save();
+      return res
+        .status(200)
+        .json({ success: true, message: "Xóa tài khoản thành công", user });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ success: false, message: "Lỗi server" });
+    }
+  },
+
   // logout
   logout: async (req, res) => {
     try {
@@ -152,6 +180,17 @@ const authControllers = {
       return res
         .status(500)
         .json({ success: false, message: "Đăng xuất thất bại" });
+    }
+  },
+
+  getProfile: async (req, res) => {
+    try {
+      const user = await User.findById(req.user.id).select("-password");
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      res.status(200).json({ success: true, user });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
     }
   },
 };

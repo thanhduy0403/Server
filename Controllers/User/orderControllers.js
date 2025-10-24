@@ -3,6 +3,7 @@ const Cart = require("../../model/cart");
 const Product = require("../../model/product");
 const Category = require("../../model/category");
 const Voucher = require("../../model/Voucher");
+const User = require("../../model/User");
 const orderControllers = {
   createOrder: async (req, res) => {
     const cartID = req.params.id;
@@ -10,15 +11,16 @@ const orderControllers = {
       address,
       username_Receive,
       phoneNumber,
-      paymentStatus,
+      paymentMethod,
       note,
       voucherID,
+      pointsUser,
     } = req.body;
     const checkCartID = await Cart.findById(cartID).populate(
       "products.product"
     );
     try {
-      if (!username_Receive || !phoneNumber || !paymentStatus) {
+      if (!username_Receive || !phoneNumber || !paymentMethod) {
         return res
           .status(400)
           .json({ success: false, message: "Vui lòng điền đầy đủ thông tin" });
@@ -39,6 +41,17 @@ const orderControllers = {
       let appliedVoucher = null; // có voucher hay không
       if (voucherID) {
         appliedVoucher = await Voucher.findById(voucherID);
+        const now = new Date();
+        if (appliedVoucher.expiryDate < now) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Voucher đã quá hạn" });
+        }
+        if (appliedVoucher.quantity <= 0) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Voucher đã hết hạn" });
+        }
         if (
           appliedVoucher &&
           totalPriceProducts >= appliedVoucher.minOrderValue
@@ -55,8 +68,28 @@ const orderControllers = {
         }
       }
 
-      // tính lại số tiền sau khi thêm voucher
-      const finalPrice = totalPriceProducts - discountAmount;
+      // giảm giá từ điểm tích nếu có
+      const VALUE_PER_POINT = 1;
+      let discountFromPoints = 0;
+      const user = await User.findById(req.user.id);
+      if (pointsUser && pointsUser > 0) {
+        if (user.point < pointsUser) {
+          res.status(403).json({
+            success: false,
+            message: "Điểm tích lũy bạn không đủ",
+          });
+        }
+      }
+      // tính tiền giảm theo điểm
+      discountFromPoints = pointsUser * VALUE_PER_POINT;
+
+      // trừ điểm
+      user.point -= pointsUser;
+      await user.save();
+
+      // tính lại số tiền sau khi thêm voucher và thêm points nếu có
+      const finalPrice =
+        totalPriceProducts - discountAmount - discountFromPoints;
       const newOrder = Order({
         userInfo: req.user.id,
         note: note,
@@ -69,7 +102,7 @@ const orderControllers = {
         },
         username_Receive: username_Receive,
         phoneNumber: phoneNumber,
-        paymentStatus: paymentStatus,
+        paymentMethod: paymentMethod,
         orderStatus: "Chưa Xác Nhận",
         products: checkCartID.products.map((item) => ({
           product: item.product._id,
@@ -85,9 +118,19 @@ const orderControllers = {
         discountAmount, // được giảm giá bao nhiêu tiền
         finalPrice, // giá tiền cần phải trả
         voucherApplied: appliedVoucher ? appliedVoucher._id : null, // nếu có voucher thì lấy còn không thì thôi
+        pointsUser: pointsUser ? pointsUser : 0,
       });
 
       await newOrder.save();
+      // tăng điểm sau khi order
+      if (user) {
+        user.point += 200; // cộng thưởng
+        await user.save();
+      }
+      if (appliedVoucher) {
+        appliedVoucher.quantity = Math.max(0, appliedVoucher.quantity - 1);
+        await appliedVoucher.save();
+      }
       // giảm số lượng sản phẩm ở kho sau khi order thành công
       // sử dụng for of để lặp qua từng sản phẩm ở model cart
       for (const item of checkCartID.products) {
@@ -119,6 +162,7 @@ const orderControllers = {
             { new: true }
           );
         }
+
         await product.save();
       }
       await Cart.findByIdAndDelete(cartID);
@@ -127,6 +171,7 @@ const orderControllers = {
         message: "Order thành công",
         order: newOrder,
         finalPrice,
+        currentPoints: user.point,
       });
     } catch (error) {
       console.log(error);
@@ -138,6 +183,7 @@ const orderControllers = {
     const userID = req.user.id;
     try {
       const getByUser = await Order.find({ userInfo: userID })
+        .sort({ createdAt: -1 })
         .populate({
           path: "cartID",
           populate: [{ path: "userInfo", select: "username" }],
@@ -240,6 +286,43 @@ const orderControllers = {
     }
   },
 
+  confirm_Received: async (req, res) => {
+    const orderID = req.params.id;
+    const { receivedStatus } = req.body;
+    try {
+      const order = await Order.findById(orderID);
+      if (!order) {
+        return res
+          .status(403)
+          .json({ success: false, message: "Không tìm thấy order" });
+      }
+      if (order.orderStatus !== "Hoàn Thành") {
+        return res.status(400).json({
+          success: false,
+          message: "Đơn hàng của bạn chưa hoàn thành",
+        });
+      }
+
+      const confirmOrder = await Order.findByIdAndUpdate(
+        orderID,
+        {
+          receivedStatus: receivedStatus || "Đã Nhận",
+        },
+        { new: true }
+      );
+      await confirmOrder.save();
+      return res.status(200).json({
+        success: true,
+        message: "Xác nhận nhận hàng thành công",
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server",
+      });
+    }
+  },
   cancel_Order: async (req, res) => {
     const orderID = req.params.id;
     try {

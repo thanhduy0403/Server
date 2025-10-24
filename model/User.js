@@ -77,6 +77,10 @@ const userSchema = new Schema({
     type: Boolean,
     default: false,
   },
+  point: {
+    type: Number,
+    default: 0,
+  },
 
   // permissions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Permission" }],
   // allowedEndpoints: [{ type: mongoose.Schema.Types.ObjectId }],

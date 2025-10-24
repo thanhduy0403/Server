@@ -66,7 +66,7 @@ function renderPaymentResultPage({ success, orderId, errorCode }) {
       <body>
         <div class="card">
           <div class="icon">✅</div>
-          <h1>Thanh toán thành công!</h1>
+          <h1>Thanh toán thành công!</h1> 
           <p>Cảm ơn bạn đã mua hàng 🛍️</p>
           <p>Mã đơn hàng: <span class="order-id">#${orderId}</span></p>
           <a href="http://localhost:3000" class="btn">Quay về trang chủ</a>

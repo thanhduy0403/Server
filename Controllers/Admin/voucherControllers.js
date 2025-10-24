@@ -2,9 +2,16 @@ const Voucher = require("../../model/Voucher");
 
 const voucherControllers = {
   postVoucher: async (req, res) => {
-    const { code, discountValue, minOrderValue, maxDiscount } = req.body;
+    const {
+      code,
+      discountValue,
+      minOrderValue,
+      maxDiscount,
+      expiryDate,
+      quantity,
+    } = req.body;
     try {
-      if (!code || !discountValue) {
+      if (!code || !discountValue || !expiryDate || !quantity) {
         return res
           .status(403)
           .json({ success: false, message: "Hãy điền đủ thông tin" });
@@ -14,6 +21,8 @@ const voucherControllers = {
         discountValue: discountValue,
         minOrderValue: minOrderValue,
         maxDiscount: maxDiscount,
+        expiryDate: expiryDate,
+        quantity: quantity,
       });
       await createVoucher.save();
       return res.status(200).json({
@@ -49,7 +58,14 @@ const voucherControllers = {
   updateVoucher: async (req, res) => {
     const voucherID = req.params.id;
     try {
-      const { code, discountValue, minOrderValue, maxDiscount } = req.body;
+      const {
+        code,
+        discountValue,
+        minOrderValue,
+        maxDiscount,
+        expiryDate,
+        quantity,
+      } = req.body;
       const checkVoucherID = await Voucher.findById(voucherID);
       if (!checkVoucherID) {
         return res
@@ -61,6 +77,8 @@ const voucherControllers = {
         discountValue: discountValue,
         minOrderValue: minOrderValue,
         maxDiscount: maxDiscount,
+        expiryDate: expiryDate,
+        quantity: quantity,
       });
       await newVoucher.save();
       return res
