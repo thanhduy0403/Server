@@ -134,11 +134,60 @@ const chatController = {
     const { message } = req.body;
     try {
       const lowerMsg = message.toLowerCase().trim();
-      const greetingKeywords = ["hi", "hello", "xin chào", "chào", "alo", "ê"];
 
-      const isGreeting = greetingKeywords.some(
-        (keyword) => lowerMsg === keyword || lowerMsg.includes(keyword)
-      );
+      const keywordGroups = {
+        greeting: [
+          "hi",
+          "hello",
+          "xin chào",
+          "chào",
+          "alo",
+          "ê",
+          "hey",
+          "chào bạn",
+        ],
+
+        discount: [
+          "giảm giá",
+          "sale",
+          "giảm mạnh",
+          "ưu đãi",
+          "khuyến mãi",
+          "giảm giá cao nhất",
+          "sản phẩm giảm",
+        ],
+
+        bestseller: [
+          "bán chạy",
+          "best seller",
+          "hot",
+          "thịnh hành",
+          "xu hướng",
+          "hot trend",
+          "sản phẩm bán chạy",
+          "phổ biến",
+          "nhiều người mua",
+          "đang hot",
+          "top trending",
+        ],
+        newProduct: [
+          "sản phẩm mới",
+          "hàng mới về",
+          "gần đây",
+          "xu hướng mới",
+          "mới ra mắt",
+        ],
+      };
+
+      const matchKeyword = (keywords) => {
+        return keywords.some(
+          (keyword) => lowerMsg === keyword || lowerMsg.includes(keyword)
+        );
+      };
+      const isGreeting = matchKeyword(keywordGroups.greeting);
+      const isAskDiscount = matchKeyword(keywordGroups.discount);
+      const isAskBestSeller = matchKeyword(keywordGroups.bestseller);
+      const isAskNewProduct = matchKeyword(keywordGroups.newProduct);
 
       // --- KIỂM TRA CHÀO HỎI ---
       if (isGreeting) {
@@ -150,12 +199,50 @@ const chatController = {
         });
       }
 
-      // --- LẤY DỮ LIỆU CƠ SỞ ---
+      // --- lấy dữ liệu cơ sở dữ liệu---
       const allCategories = await Category.find().lean();
       const allProducts = await Product.find()
         .populate("categoryID")
         .lean({ virtuals: true });
 
+      // sản phẩm có giảm giá cao nhất
+      const bestDiscountProduct = allProducts
+        .filter((p) => !p.isDelete)
+        .sort((a, b) => b.discount - a.discount)
+        .slice(0, 4);
+
+      if (isAskDiscount) {
+        return res.json({
+          reply: `Dưới đây là top 4 sản phẩm ${message}`,
+          products: bestDiscountProduct,
+          topDiscount: bestDiscountProduct,
+        });
+      }
+      // sản phẩm hot
+      const bestsellerProduct = allProducts
+        .filter((p) => !p.isDelete)
+        .sort((a, b) => b.soldCount - a.soldCount)
+        .slice(0, 4);
+      if (isAskBestSeller) {
+        return res.json({
+          reply: `Top 4 sản phẩm ${message}`,
+          products: bestsellerProduct,
+          topBestSeller: bestsellerProduct,
+        });
+      }
+
+      // sản phẩm gần đây
+      const newProducts = allProducts
+        .filter((p) => !p.isDelete)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 4);
+      if (isAskNewProduct) {
+        return res.json({
+          reply: `Top 4 sản phẩm ${message}`,
+          products: newProducts,
+          topNewProducts: newProducts,
+        });
+      }
       let filteredProducts = [];
       let matchedCategory = null;
       let matchedKeyword = null;
@@ -179,7 +266,7 @@ const chatController = {
         );
       } else {
         // 1.2 Nếu không khớp Category theo cụm từ, tìm kiếm theo từ khóa đơn
-        const words = lowerMsg.split(/\s+/).filter((w) => w.length > 2);
+        const words = lowerMsg.split(/\s+/).filter((w) => w.length >= 1);
 
         // Lặp qua từ đơn để tìm Category hoặc Product khớp
         for (let w of words) {
@@ -262,6 +349,9 @@ const chatController = {
       res.json({
         reply: aiReply,
         products: productsForDisplay,
+        topDiscount: bestDiscountProduct,
+        topBestSeller: bestsellerProduct,
+        topNewProducts: newProducts,
       });
     } catch (err) {
       console.error("Lỗi Chatbot:", err);

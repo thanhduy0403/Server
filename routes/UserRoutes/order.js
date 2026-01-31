@@ -1,23 +1,23 @@
 const router = require("express").Router();
 
-const { verifyToken } = require("../../middleware/verifyToken");
+const { verifyToken, protectRouter } = require("../../middleware/verifyToken");
 const orderControllers = require("../../Controllers/User/orderControllers");
 
 //Create_Order
-router.post("/:id", verifyToken, orderControllers.createOrder);
+router.post("/:id", protectRouter, orderControllers.createOrder);
 
 //Get CreateBy
-router.get("/getCreateBy", verifyToken, orderControllers.getCreateByUser);
+router.get("/getCreateBy", protectRouter, orderControllers.getCreateByUser);
 
 // get OderID
-router.get("/:id", verifyToken, orderControllers.getDetailOrder);
+router.get("/:id", protectRouter, orderControllers.getDetailOrder);
 
 //confirm_Received
-router.patch("/:id", verifyToken, orderControllers.confirm_Received);
+router.patch("/:id", protectRouter, orderControllers.confirm_Received);
 
 //Update Order
-router.patch("/:id", verifyToken, orderControllers.updateOrder);
+router.patch("/changeAddress/:id", protectRouter, orderControllers.updateOrder);
 
 // Cancel Order
-router.delete("/:id", verifyToken, orderControllers.cancel_Order);
+router.delete("/:id", protectRouter, orderControllers.cancel_Order);
 module.exports = router;

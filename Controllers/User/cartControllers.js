@@ -45,7 +45,7 @@ const cartControllers = {
           });
         }
       }
-      let cart = await Cart.findOne({ userInfo: req.user.id });
+      let cart = await Cart.findOne({ userInfo: req.user._id });
       // nếu giỏ hàng đã tồn tại
       // sản phẩm đã có trong giỏ hàng
       if (cart) {
@@ -55,7 +55,7 @@ const cartControllers = {
             product.product.toString() === productID &&
             (checkProductID.sizes.length > 0
               ? product.size === size
-              : !product.size)
+              : !product.size),
         );
         if (productIndex > -1) {
           // đã có sản phẩm tồn tại mà vẫn muốn thêm ở ngoài chi tiết sản phẩm
@@ -99,7 +99,7 @@ const cartControllers = {
       // chưa có giỏ hàng
       else {
         cart = new Cart({
-          userInfo: req.user.id,
+          userInfo: req.user._id,
           products: [
             {
               product: productID,
@@ -154,7 +154,7 @@ const cartControllers = {
   //   }
   // },
   getCart: async (req, res) => {
-    const cartID = req.user.id;
+    const cartID = req.user._id;
     try {
       const getCreateBy = await Cart.findOne({ userInfo: cartID }).populate({
         path: "products.product",
@@ -224,7 +224,7 @@ const cartControllers = {
         }
       }
 
-      const cart = await Cart.findOne({ userInfo: req.user.id });
+      const cart = await Cart.findOne({ userInfo: req.user._id });
       if (!cart) {
         return res
           .status(404)
@@ -234,7 +234,7 @@ const cartControllers = {
       const productIndex = cart.products.findIndex(
         (p) =>
           p.product.toString() === productID &&
-          (checkProductID.sizes.length > 0 ? p.size === size : !p.size)
+          (checkProductID.sizes.length > 0 ? p.size === size : !p.size),
       );
       if (productIndex === -1) {
         return res.status(404).json({
@@ -257,14 +257,14 @@ const cartControllers = {
     const productID = req.params.id;
     const { size } = req.body;
     try {
-      const cart = await Cart.findOne({ userInfo: req.user.id });
+      const cart = await Cart.findOne({ userInfo: req.user._id });
       if (!cart) {
         return res
           .status(404)
           .json({ success: false, message: "Không tìm thấy giỏ hàng" });
       }
       const productIndex = cart.products.findIndex(
-        (p) => p.product.toString() === productID && p.size === size
+        (p) => p.product.toString() === productID && p.size === size,
       );
       if (productIndex === -1) {
         return res

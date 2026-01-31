@@ -186,12 +186,13 @@ const accountControllers = {
   deleteAccount: async (req, res) => {
     const accountID = req.params.id;
     try {
-      const checkAccount = await Account.findByIdAndDelete(accountID);
+      const checkAccount = await Account.findById(accountID);
       if (!checkAccount) {
         return res
           .status(403)
           .json({ success: false, message: "Không tìm thấy tài khoản" });
       }
+      await Account.findByIdAndDelete(accountID);
       return res
         .status(200)
         .json({ success: false, message: "Xóa thành công tài khoản" });

@@ -150,7 +150,7 @@ const categoryControllers = {
       if (deleteItem.products && deleteItem.products.length > 0) {
         return res
           .status(400)
-          .json({ success: false, message: "Bạn không thể xóa danh mục này" });
+          .json({ success: false, message: "Danh mục đang tồn tại sản phẩm không thể xóa" });
       }
       await Category.findByIdAndDelete(idCategory);
       return res

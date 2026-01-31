@@ -4,6 +4,7 @@ const Product = require("../../model/product");
 const Category = require("../../model/category");
 const Voucher = require("../../model/Voucher");
 const User = require("../../model/User");
+const { getIO } = require("../../socket");
 const orderControllers = {
   createOrder: async (req, res) => {
     const cartID = req.params.id;
@@ -19,17 +20,26 @@ const orderControllers = {
     const checkCartID = await Cart.findById(cartID).populate(
       "products.product"
     );
+
     try {
       if (!username_Receive || !phoneNumber || !paymentMethod) {
         return res
           .status(400)
           .json({ success: false, message: "Vui lòng điền đầy đủ thông tin" });
       }
-      if (!checkCartID || checkCartID.length === 0) {
+      if (
+        !checkCartID ||
+        !Array.isArray(checkCartID.products) ||
+        checkCartID.products.length === 0
+      ) {
         return res
           .status(403)
-          .json({ success: false, message: "Không tìm thấy giỏ hàng" });
+          .json({
+            success: false,
+            message: "Không có sản phẩm trong giỏ hàng",
+          });
       }
+
       const totalPriceProducts = checkCartID.products.reduce(
         (sum, item) =>
           sum +
@@ -37,8 +47,8 @@ const orderControllers = {
         0
       );
 
-      let discountAmount = 0; // được giảm giá bao nhiêu
-      let appliedVoucher = null; // có voucher hay không
+      let discountAmount = 0;
+      let appliedVoucher = null;
       if (voucherID) {
         appliedVoucher = await Voucher.findById(voucherID);
         const now = new Date();
@@ -56,40 +66,35 @@ const orderControllers = {
           appliedVoucher &&
           totalPriceProducts >= appliedVoucher.minOrderValue
         ) {
-          // tính voucher sẽ được giảm giá bao nhiêu tiền
           discountAmount =
             (totalPriceProducts * appliedVoucher.discountValue) / 100;
         }
-        if (
-          // nếu mà giảm giá được 120k nhưng maxDiscount === 100k thì discountAmount === 100k
-          discountAmount > appliedVoucher.maxDiscount
-        ) {
+        if (discountAmount > appliedVoucher.maxDiscount) {
           discountAmount = appliedVoucher.maxDiscount;
         }
       }
 
-      // giảm giá từ điểm tích nếu có
       const VALUE_PER_POINT = 1;
       let discountFromPoints = 0;
       const user = await User.findById(req.user.id);
+
       if (pointsUser && pointsUser > 0) {
         if (user.point < pointsUser) {
-          res.status(403).json({
+          return res.status(403).json({
             success: false,
             message: "Điểm tích lũy bạn không đủ",
           });
         }
+        discountFromPoints = pointsUser * VALUE_PER_POINT;
       }
-      // tính tiền giảm theo điểm
-      discountFromPoints = pointsUser * VALUE_PER_POINT;
 
-      // trừ điểm
-      user.point -= pointsUser;
-      await user.save();
-
-      // tính lại số tiền sau khi thêm voucher và thêm points nếu có
       const finalPrice =
         totalPriceProducts - discountAmount - discountFromPoints;
+
+      // ✅ Thiết lập paymentStatus dựa vào phương thức thanh toán
+      const initialPaymentStatus =
+        paymentMethod === "Thanh Toán Online" ? "Đang Chờ" : "Thành Công";
+
       const newOrder = Order({
         userInfo: req.user.id,
         note: note,
@@ -104,6 +109,7 @@ const orderControllers = {
         phoneNumber: phoneNumber,
         paymentMethod: paymentMethod,
         orderStatus: "Chưa Xác Nhận",
+        paymentStatus: initialPaymentStatus, // ✅ Quan trọng!
         products: checkCartID.products.map((item) => ({
           product: item.product._id,
           quantity: item.quantity,
@@ -115,57 +121,72 @@ const orderControllers = {
           discount: item.product.discount,
         })),
         totalPriceProduct: totalPriceProducts,
-        discountAmount, // được giảm giá bao nhiêu tiền
-        finalPrice, // giá tiền cần phải trả
-        voucherApplied: appliedVoucher ? appliedVoucher._id : null, // nếu có voucher thì lấy còn không thì thôi
+        discountAmount,
+        finalPrice,
+        voucherApplied: appliedVoucher ? appliedVoucher._id : null,
         pointsUser: pointsUser ? pointsUser : 0,
       });
 
       await newOrder.save();
-      // tăng điểm sau khi order
-      if (user) {
-        user.point += 200; // cộng thưởng
+
+      // ⚡ CHỈ xử lý điểm, kho, voucher và emit socket cho COD
+      if (paymentMethod === "Thanh Toán Khi Nhận Hàng") {
+        // Trừ điểm người dùng
+        user.point -= pointsUser || 0;
+        // Cộng điểm thưởng
+        // user.point += 200;
         await user.save();
-      }
-      if (appliedVoucher) {
-        appliedVoucher.quantity = Math.max(0, appliedVoucher.quantity - 1);
-        await appliedVoucher.save();
-      }
-      // giảm số lượng sản phẩm ở kho sau khi order thành công
-      // sử dụng for of để lặp qua từng sản phẩm ở model cart
-      for (const item of checkCartID.products) {
-        const product = await Product.findById(item.product._id);
-        // tránh trường hợp bị âm nếu order sản phẩm quá số lượng thì trả về  0
-        // product.amount =  math.max(0, product.amount - item.quantity)
-        if (product.sizes && product.sizes.length > 0 && item.size) {
-          const sizeIndex = product.sizes.findIndex(
-            (s) => s.size === item.size
-          );
-          if (sizeIndex !== -1) {
-            // các size hiện tại trong kho
-            const currentQuantity = product.sizes[sizeIndex].quantity || 0;
-            product.sizes[sizeIndex].quantity = Math.max(
-              0,
-              currentQuantity - item.quantity
-            );
-          }
-        } else {
-          product.stock = Math.max(0, (product.stock || 0) - item.quantity);
-        }
-        product.soldCount = (product.soldCount || 0) + item.quantity;
-        if (product.categoryID) {
-          await Category.findByIdAndUpdate(
-            product.categoryID,
-            {
-              $inc: { soldCount: item.quantity },
-            },
-            { new: true }
-          );
+
+        // Giảm voucher
+        if (appliedVoucher) {
+          appliedVoucher.quantity = Math.max(0, appliedVoucher.quantity - 1);
+          await appliedVoucher.save();
         }
 
-        await product.save();
+        // Giảm số lượng sản phẩm trong kho
+        for (const item of checkCartID.products) {
+          const product = await Product.findById(item.product._id);
+
+          if (product.sizes && product.sizes.length > 0 && item.size) {
+            const sizeIndex = product.sizes.findIndex(
+              (s) => s.size === item.size
+            );
+            if (sizeIndex !== -1) {
+              const currentQuantity = product.sizes[sizeIndex].quantity || 0;
+              product.sizes[sizeIndex].quantity = Math.max(
+                0,
+                currentQuantity - item.quantity
+              );
+            }
+          } else {
+            product.stock = Math.max(0, (product.stock || 0) - item.quantity);
+          }
+
+          product.soldCount = (product.soldCount || 0) + item.quantity;
+
+          if (product.categoryID) {
+            await Category.findByIdAndUpdate(
+              product.categoryID,
+              { $inc: { soldCount: item.quantity } },
+              { new: true }
+            );
+          }
+
+          await product.save();
+        }
+
+        // Xóa giỏ hàng
+        await Cart.findByIdAndDelete(cartID);
+
+        // ✅ EMIT SOCKET CHỈ KHI COD
+        const io = getIO();
+        io.to("admins").emit("new_order", {
+          message: "Bạn có đơn hàng mới",
+          newOrder,
+        });
       }
-      await Cart.findByIdAndDelete(cartID);
+      // ⚠️ Nếu là VNPay: KHÔNG xử lý gì cả, chờ callback
+
       return res.status(200).json({
         success: true,
         message: "Order thành công",

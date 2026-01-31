@@ -1,17 +1,17 @@
 const router = require("express").Router();
 
-const { verifyToken } = require("../../middleware/verifyToken");
+const { verifyToken, protectRouter } = require("../../middleware/verifyToken");
 const cartControllers = require("../../Controllers/User/cartControllers");
 
 // add To Cart
-router.post("/:id", verifyToken, cartControllers.addCart);
+router.post("/:id", protectRouter, cartControllers.addCart);
 
 //get Car CreateBy
-router.get("/getCart", verifyToken, cartControllers.getCart);
+router.get("/getCart", protectRouter, cartControllers.getCart);
 
 //update Cart
-router.patch("/:id", verifyToken, cartControllers.updateCart);
+router.patch("/:id", protectRouter, cartControllers.updateCart);
 
 // deleteCart
-router.delete("/:id", verifyToken, cartControllers.deleteItem);
+router.delete("/:id", protectRouter, cartControllers.deleteItem);
 module.exports = router;

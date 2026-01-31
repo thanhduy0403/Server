@@ -1,7 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../model/User");
 const Account = require("../model/Account");
-const pathToRegexp = require("path-to-regexp");
 const Permission = require("../model/permission");
 const { match } = require("path-to-regexp");
 
@@ -29,6 +28,42 @@ const { match } = require("path-to-regexp");
 // };
 
 // save token ở cookie
+
+const protectRouter = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(" ")[1];
+
+    if (!token) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Không tìm thấy token" });
+    }
+
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+
+    if (!decoded?.userId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Token không hợp lệ" });
+    }
+
+    const user = await User.findById(decoded.userId).select("-hashPassword");
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Không tìm thấy user" });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token không hợp lệ hoặc hết hạn" });
+  }
+};
 
 const verifyToken = (req, res, next) => {
   try {
@@ -133,7 +168,7 @@ const checkPermission = async (req, res, next) => {
         return res.status(403).json({ message: "Subadmin không tồn tại" });
 
       const allowedEndpointIDs = subadmin.allowedEndpoints.map((id) =>
-        id.toString()
+        id.toString(),
       );
       const allPermissions = await Permission.find();
 
@@ -162,7 +197,7 @@ const checkPermission = async (req, res, next) => {
         if (ep.path.includes(":id") && matched.params.id) {
           if (!isMongoId(matched.params.id)) {
             console.log(
-              `Invalid MongoId: ${matched.params.id} for path: ${ep.path}`
+              `Invalid MongoId: ${matched.params.id} for path: ${ep.path}`,
             );
             return false;
           }
@@ -186,6 +221,7 @@ const checkPermission = async (req, res, next) => {
 };
 
 module.exports = {
+  protectRouter,
   protect,
   checkPermission,
   verifyToken,

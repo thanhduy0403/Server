@@ -10,6 +10,9 @@ const productSchema = new Schema({
   image: {
     type: String,
   },
+  productType: {
+    type: String,
+  },
   gallery: [{ type: String }],
   description: {
     type: String,

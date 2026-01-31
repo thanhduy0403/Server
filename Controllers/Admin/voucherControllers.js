@@ -93,12 +93,13 @@ const voucherControllers = {
   deleteVoucher: async (req, res) => {
     const voucherID = req.params.id;
     try {
-      const checkVoucherID = await Voucher.findByIdAndDelete(voucherID);
+      const checkVoucherID = await Voucher.findById(voucherID);
       if (!checkVoucherID) {
         return res
           .status(403)
           .json({ success: false, message: "Không tìm thấy voucher" });
       }
+      await Voucher.findByIdAndDelete(voucherID);
       return res
         .status(200)
         .json({ success: true, message: "Xóa voucher thành công" });

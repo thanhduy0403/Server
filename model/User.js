@@ -13,7 +13,11 @@ const userSchema = new Schema({
     match: /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/,
     unique: true,
   },
-  password: {
+  // password: {
+  //   type: String,
+  //   required: true,
+  // },
+  hashPassword: {
     type: String,
     required: true,
   },
@@ -57,26 +61,26 @@ const userSchema = new Schema({
     default: false,
   },
   // Token reset password (dành cho đường dẫn)
-  passwordChangedAt: {
-    type: String,
-  },
-  passwordResetToken: {
-    type: String,
-  },
-  passwordResetExpires: {
-    type: String,
-  },
+  // passwordChangedAt: {
+  //   type: String,
+  // },
+  // passwordResetToken: {
+  //   type: String,
+  // },
+  // passwordResetExpires: {
+  //   type: String,
+  // },
   // Mã OTP và thời gian hết hạn (dành cho bước xác thực OTP)
-  resetOTP: {
-    type: String,
-  },
-  resetOTPExpires: {
-    type: String,
-  },
-  resetVerified: {
-    type: Boolean,
-    default: false,
-  },
+  // resetOTP: {
+  //   type: String,
+  // },
+  // resetOTPExpires: {
+  //   type: String,
+  // },
+  // resetVerified: {
+  //   type: Boolean,
+  //   default: false,
+  // },
   point: {
     type: Number,
     default: 0,
@@ -86,22 +90,22 @@ const userSchema = new Schema({
   // allowedEndpoints: [{ type: mongoose.Schema.Types.ObjectId }],
 });
 
-userSchema.methods.createPasswordChangedToken = function (password) {
-  const resetToken = crypto.randomBytes(32).toString("hex");
-  this.passwordResetToken = crypto
-    .createHash("sha256")
-    .update(resetToken)
-    .digest("hex");
-  this.passwordResetExpires = Date.now() + 15 * 60 * 1000;
-  return resetToken;
-};
+// userSchema.methods.createPasswordChangedToken = function (password) {
+//   const resetToken = crypto.randomBytes(32).toString("hex");
+//   this.passwordResetToken = crypto
+//     .createHash("sha256")
+//     .update(resetToken)
+//     .digest("hex");
+//   this.passwordResetExpires = Date.now() + 15 * 60 * 1000;
+//   return resetToken;
+// };
 
-userSchema.methods.createPasswordResetOTP = function () {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 chữ số
-  this.resetOTP = otp;
-  this.resetOTPExpires = Date.now() + 5 * 60 * 1000;
-  return otp;
-};
+// userSchema.methods.createPasswordResetOTP = function () {
+//   const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 chữ số
+//   this.resetOTP = otp;
+//   this.resetOTPExpires = Date.now() + 5 * 60 * 1000;
+//   return otp;
+// };
 
 // userSchema.pre("save", async function (next) {
 //   if (this.isModified("password")) {

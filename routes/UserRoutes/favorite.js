@@ -1,14 +1,14 @@
 const favoriteController = require("../../Controllers/User/favoriteControllers");
-const { verifyToken } = require("../../middleware/verifyToken");
+const { verifyToken, protectRouter } = require("../../middleware/verifyToken");
 
 const router = require("express").Router();
 
 // add favorite
-router.post("/:id", verifyToken, favoriteController.addToFavorite);
+router.post("/:id", protectRouter, favoriteController.addToFavorite);
 
 // get favorite by user
-router.get("/getFavorite", verifyToken, favoriteController.getCreateByUser);
+router.get("/getFavorite", protectRouter, favoriteController.getCreateByUser);
 
 // delete Item
-router.delete("/:id", verifyToken, favoriteController.deleteItemFavorite);
+router.delete("/:id", protectRouter, favoriteController.deleteItemFavorite);
 module.exports = router;

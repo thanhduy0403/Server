@@ -16,7 +16,7 @@ const favoriteController = {
       // người dùng đã có danh sách yêu thích trước đó
       if (favorite) {
         const alreadyExit = favorite.products.some(
-          (item) => item.productID.toString() === productID
+          (item) => item.productID.toString() === productID,
         );
         if (alreadyExit) {
           return res.status(200).json({
@@ -43,7 +43,7 @@ const favoriteController = {
       await favorite.save();
       return res.status(200).json({
         success: true,
-        message: "Đã sản phẩm vào danh mục yêu thích",
+        message: "Danh sách sản phẩm trong mục yêu thích",
         favorite,
       });
     } catch (error) {
@@ -57,7 +57,7 @@ const favoriteController = {
   getCreateByUser: async (req, res) => {
     try {
       const favorite = await Favorite.findOne({
-        userInfo: req.user.id,
+        userInfo: req.user._id,
       }).populate({
         path: "products.productID", // populate productID
         populate: { path: "categoryID", select: "name" }, // populate luôn categoryID trong productID
@@ -90,7 +90,7 @@ const favoriteController = {
         });
       }
       const productIndex = favorite.products.findIndex(
-        (p) => p.productID.toString() === productID
+        (p) => p.productID.toString() === productID,
       );
       if (!productIndex === 0) {
         return res

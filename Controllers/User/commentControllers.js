@@ -1,6 +1,5 @@
 const Comment = require("../../model/comment");
-const { v4: uuidv4 } = require("uuid");
-
+const { getIO } = require("../../socket");
 const commentControllers = {
   createComment: async (req, res) => {
     try {
@@ -21,10 +20,15 @@ const commentControllers = {
           question: question.trim(),
         });
         await newComment.save();
-
+        const io = getIO();
+        io.to("admins").emit("comment", {
+          message: "Bạn có 1 bình luận mới",
+          newComment,
+          productId: productID,
+        });
         return res.status(200).json({
           success: true,
-          message: "gửi nội dung thành công",
+          message: "Bình luận thành công",
           newComment,
         });
       }
@@ -46,10 +50,16 @@ const commentControllers = {
         guestName: guestName.trim(),
         question: question.trim(),
       });
+      const io = getIO();
+      io.to("admins").emit("comment", {
+        message: "Bạn có 1 bình luận luận mới",
+        productId: productID,
+      });
       await newComment.save();
+
       return res.status(200).json({
         success: true,
-        message: "gửi nội dung thành công",
+        message: "Bình luận thành công",
         newComment,
       });
     } catch (error) {
@@ -217,14 +227,14 @@ const commentControllers = {
         if (!isReplyOwner) {
           return res
             .status(403)
-            .json({ success: false, message: "Không có quyền xóa reply này" });
+            .json({ success: false, message: "Không thể xóa phản hồi này" });
         }
 
         reply.deleteOne();
         await comment.save();
         return res
           .status(200)
-          .json({ success: true, message: "Xóa reply thành công" });
+          .json({ success: true, message: "Xóa phản hồi thành công" });
       }
 
       // ===============================
@@ -235,15 +245,16 @@ const commentControllers = {
         comment.userID && userID && comment.userID.toString() === userID;
 
       if (!isCommentOwner) {
-        return res
-          .status(403)
-          .json({ success: false, message: "Không có quyền xoá comment này" });
+        return res.status(403).json({
+          success: false,
+          message: "Không thể xoá bình luận này",
+        });
       }
 
       await Comment.findByIdAndDelete(commentID);
       return res
         .status(200)
-        .json({ success: true, message: "Xóa comment thành công" });
+        .json({ success: true, message: "Xóa bình luận thành công" });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ success: false, message: "Lỗi server" });
@@ -288,14 +299,14 @@ const commentControllers = {
       if (!isCommentOwner) {
         return res.status(403).json({
           success: false,
-          message: "Không có quyền sửa comment này",
+          message: "Không có quyền sửa bình luận này",
         });
       }
       comment.question = question;
       await comment.save();
       return res.status(200).json({
         success: true,
-        message: "Cập nhật comment thành công",
+        message: "Cập nhật bình luận thành công",
       });
     } catch (error) {
       return res.status(500).json({

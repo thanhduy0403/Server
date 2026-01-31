@@ -229,14 +229,14 @@ const userControllers = {
       if (!user) {
         return res
           .status(403)
-          .json({ success: false, message: "Không tìm thấy người dùng" });
+          .json({ success: false, message: "Không tìm thấy khách hàng" });
       } else {
         user.status = "Đã xóa";
         user.isDelete = true;
         await user.save();
         return res
           .status(200)
-          .json({ success: true, message: "Xóa người dùng thành công", user });
+          .json({ success: true, message: "Xóa khách hàng thành công", user });
       }
     } catch (error) {
       return res.status(500).json({ success: false, message: "Lỗi" });

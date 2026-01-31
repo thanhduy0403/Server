@@ -2,18 +2,19 @@ const { VNPay, HashAlgorithm, ProductCode } = require("vnpay");
 const Order = require("../../model/order");
 const renderPaymentResultPage = require("../../utils/renderPaymentResultPage");
 const User = require("../../model/User");
+const Product = require("../../model/product");
+const Cart = require("../../model/cart"); // ✅ BỔ SUNG
+const Voucher = require("../../model/Voucher"); // ✅ BỔ SUNG
+const Category = require("../../model/category"); // ✅ BỔ SUNG
+const { getIO } = require("../../socket"); // ✅ QUAN TRỌNG - Import getIO
 
 const vnpay = new VNPay({
-  // ⚡ Cấu hình bắt buộc
-  tmnCode: "H0HKG0HO",
-  secureSecret: "S4RE1WBDYT63XIKY5D1L8GXMCPZAD7Q7",
+  tmnCode: "H7A4Y81V",
+  secureSecret: "JLM8KV0KBHZLBWS2I9YA6J69JTG3NB1J",
   vnpayHost: "https://sandbox.vnpayment.vn",
-
-  // 🔧 Cấu hình tùy chọn
-  testMode: true, // Chế độ test
-  hashAlgorithm: "SHA512", // Thuật toán mã hóa
-  enableLog: true, // Bật/tắt log
-  //   loggerFn: ignoreLogger, // Custom logger
+  testMode: true,
+  hashAlgorithm: "SHA512",
+  enableLog: true,
 });
 
 const VNPayControllers = {
@@ -33,7 +34,7 @@ const VNPayControllers = {
         vnp_IpAddr: req.headers["x-forwarded-for"] || req.socket.remoteAddress,
         vnp_Locale: "vn",
         vnp_OrderType: ProductCode.Other,
-        vnp_ReturnUrl: "http://localhost:5000/v1/user/pay/vnpay_return", // <-- chuyển đến trang thông báo
+        vnp_ReturnUrl: "http://localhost:5000/v1/user/pay/vnpay_return",
       });
 
       return res.status(200).json({ success: true, paymentURL });
@@ -42,55 +43,149 @@ const VNPayControllers = {
       return res.status(500).json({ success: false, message: "Lỗi server" });
     }
   },
+
   paymentReturn: async (req, res) => {
-    const verified = vnpay.verifyReturnUrl(req.query);
-    const orderId = req.query.vnp_TxnRef;
-    const responseCode = req.query.vnp_ResponseCode; // Mã phản hồi của VNPay // Tìm đơn hàng
+    try {
+      const verified = vnpay.verifyReturnUrl(req.query);
+      const orderId = req.query.vnp_TxnRef;
+      const responseCode = req.query.vnp_ResponseCode;
 
-    const order = await Order.findById(orderId);
-    const user = order ? await User.findById(order.userInfo) : null;
-    const cartID = order ? order.cartID : null;
+      console.log(" VNPay Return - OrderID:", orderId);
+      console.log(" Response Code:", responseCode);
+      console.log("Verified:", verified);
 
-    if (!verified || !order || !user) {
-      // Thậm chí nếu xác thực thất bại, vẫn cố gắng cập nhật trạng thái đơn hàng nếu tìm thấy
-      if (order) {
-        order.paymentStatus = "Thất Bại";
-        await order.save();
-      }
-      return res.send(
-        renderPaymentResultPage({
-          success: false,
-          errorCode: "Xác thực thất bại/Không tìm thấy đơn hàng",
-        })
-      );
-    } // Nếu thanh toán thành công
-    if (responseCode === "00") {
-      // Kiểm tra tránh xử lý trùng lặp
-      if (order.paymentStatus === "Đang Chờ") {
-        try {
-          // 1. Xử lý thành công đơn hàng (trừ điểm, cộng thưởng, giảm kho/voucher)
-          // *Gọi hàm processOrderSuccess đã định nghĩa ở trên (bạn cần import)
-          await processOrderSuccess(order, user); // 2. Cập nhật trạng thái
-          order.paymentStatus = "Thành Công";
-          order.orderStatus = "Đã Xác Nhận"; // Chuyển sang đã xác nhận vì đã thanh toán
-          await order.save(); // 3. Xóa giỏ hàng
-          await Cart.findByIdAndDelete(cartID);
-        } catch (error) {
-          console.error("Lỗi xử lý điểm/kho sau VNPay:", error); // Có thể log lỗi nhưng vẫn trả về thành công cho người dùng
+      const order = await Order.findById(orderId).populate("products.product");
+      const user = order ? await User.findById(order.userInfo) : null;
+      const cartID = order ? order.cartID : null;
+
+      if (!verified || !order || !user) {
+        if (order) {
+          order.paymentStatus = "Thất Bại";
+          await order.save();
         }
-      } // Trả về trang thông báo
-      return res.send(renderPaymentResultPage({ success: true, orderId }));
-    } else {
-      // Thanh toán thất bại (vnp_ResponseCode !== "00")
-      if (order.paymentStatus === "Đang Chờ") {
-        order.paymentStatus = "Thất Bại";
-        order.orderStatus = "Đã Hủy"; // Đơn hàng bị hủy nếu thanh toán thất bại
-        await order.save();
+        return res.send(
+          renderPaymentResultPage({
+            success: false,
+            errorCode: "Xác thực thất bại/Không tìm thấy đơn hàng",
+          })
+        );
       }
+
+      // ✅ Thanh toán thành công
+      if (responseCode === "00") {
+        console.log(" VNPay thanh toán thành công");
+
+        if (order.paymentStatus === "Đang Chờ") {
+          try {
+            // 1. Trừ điểm đã dùng
+            user.point -= order.pointsUser || 0;
+            // 2. Cộng điểm thưởng
+            // user.point += 200;
+            await user.save();
+            console.log("Đã cập nhật điểm user");
+
+            // 3. Giảm voucher
+            if (order.voucherApplied) {
+              const voucher = await Voucher.findById(order.voucherApplied);
+              if (voucher) {
+                voucher.quantity = Math.max(0, voucher.quantity - 1);
+                await voucher.save();
+                console.log("✅ Đã giảm voucher");
+              }
+            }
+
+            // 4. Giảm số lượng sản phẩm trong kho
+            for (const item of order.products) {
+              const product = await Product.findById(item.product);
+              if (!product) continue;
+
+              if (product.sizes && product.sizes.length > 0 && item.size) {
+                const sizeIndex = product.sizes.findIndex(
+                  (s) => s.size === item.size
+                );
+                if (sizeIndex !== -1) {
+                  const currentQuantity =
+                    product.sizes[sizeIndex].quantity || 0;
+                  product.sizes[sizeIndex].quantity = Math.max(
+                    0,
+                    currentQuantity - item.quantity
+                  );
+                }
+              } else {
+                product.stock = Math.max(
+                  0,
+                  (product.stock || 0) - item.quantity
+                );
+              }
+
+              product.soldCount = (product.soldCount || 0) + item.quantity;
+
+              if (product.categoryID) {
+                await Category.findByIdAndUpdate(
+                  product.categoryID,
+                  { $inc: { soldCount: item.quantity } },
+                  { new: true }
+                );
+              }
+
+              await product.save();
+            }
+            console.log("✅ Đã cập nhật kho");
+
+            // 5. Cập nhật trạng thái đơn hàng
+            order.paymentStatus = "Thành Công";
+            order.orderStatus = "Đã Xác Nhận";
+            await order.save();
+            console.log("✅ Đã cập nhật trạng thái đơn hàng");
+
+            // 6. Xóa giỏ hàng
+            if (cartID) {
+              await Cart.findByIdAndDelete(cartID);
+              console.log("✅ Đã xóa giỏ hàng");
+            }
+
+            // ✅ EMIT SOCKET SAU KHI THANH TOÁN VNPAY THÀNH CÔNG
+            try {
+              const io = getIO();
+              io.to("admins").emit("new_order", {
+                message: "Bạn có đơn hàng mới",
+                newOrder: order,
+              });
+              console.log("✅ ĐÃ GỬI SOCKET THÔNG BÁO CHO ADMIN");
+            } catch (socketError) {
+              console.error("❌ Lỗi khi gửi socket:", socketError);
+            }
+          } catch (error) {
+            console.error("❌ Lỗi xử lý sau VNPay:", error);
+          }
+        } else {
+          console.log("⚠️ Order đã được xử lý trước đó:", order.paymentStatus);
+        }
+
+        return res.send(renderPaymentResultPage({ success: true, orderId }));
+      } else {
+        // ❌ Thanh toán thất bại
+        console.log("❌ VNPay thanh toán thất bại - Code:", responseCode);
+
+        if (order.paymentStatus === "Đang Chờ") {
+          order.paymentStatus = "Thất Bại";
+          order.orderStatus = "Đã Hủy";
+          await order.save();
+        }
+
+        return res.send(
+          renderPaymentResultPage({
+            success: false,
+            errorCode: responseCode,
+          })
+        );
+      }
+    } catch (error) {
+      console.error("❌ Lỗi tổng thể trong paymentReturn:", error);
       return res.send(
         renderPaymentResultPage({
           success: false,
-          errorCode: responseCode,
+          errorCode: "Lỗi hệ thống",
         })
       );
     }

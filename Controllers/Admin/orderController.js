@@ -2,6 +2,7 @@ const Cart = require("../../model/cart");
 const Category = require("../../model/category");
 const Order = require("../../model/order");
 const Product = require("../../model/product");
+const { getIO } = require("../../socket");
 const orderController = {
   createOder: async (req, res) => {
     const cartID = req.params.id;
@@ -108,6 +109,7 @@ const orderController = {
   getList: async (req, res) => {
     try {
       const getListOder = await Order.find()
+        .sort({ createdAt: -1 })
         .populate({
           path: "cartID",
           populate: [
@@ -203,13 +205,22 @@ const orderController = {
         orderID,
         {
           orderStatus: orderStatus,
-          paymentMethod: paymentMethod,
+          paymentMethod: orderStatus === "Đã Hủy" ? "Thất Bại" : paymentMethod,
           expectedDeliveryAt,
         },
         { new: true }
       );
       console.log(expectedDeliveryAt);
       await confirmOrderStatus.save();
+
+      // socket
+      const io = getIO();
+      const ownerID = confirmOrderStatus.userInfo;
+      io.to(`user_${ownerID}`).emit("confirm_order", {
+        message: `Đơn hàng của bạn ${orderStatus}`,
+        confirmOrderStatus,
+      });
+
       return res.status(200).json({
         success: true,
         message: "Cập nhật thành công",
@@ -223,21 +234,31 @@ const orderController = {
   cancel_Order: async (req, res) => {
     const orderID = req.params.id;
     try {
-      const checkOrder = await Order.findById(orderID);
-      if (!checkOrder) {
+      const checkOrderIDCancel = await Order.findById(orderID);
+      if (!checkOrderIDCancel) {
         return res
           .status(403)
           .json({ success: false, message: "Không tồn tại sản phẩm Order" });
       }
-      checkOrder.deletedAt = new Date();
-      checkOrder.isDeleted = true;
-      checkOrder.orderStatus = "Đã Hủy";
-      checkOrder.paymentMethod = "Thất Bại";
-      await checkOrder.save();
-      return res
-        .status(200)
-        .json({ success: true, message: "Hủy order thành công" });
+      checkOrderIDCancel.deletedAt = new Date();
+      checkOrderIDCancel.isDeleted = true;
+      checkOrderIDCancel.orderStatus = "Đã Hủy";
+      checkOrderIDCancel.paymentMethod = "Thất Bại";
+      await checkOrderIDCancel.save();
+      const io = getIO();
+      const ownerID = checkOrderIDCancel.userInfo;
+      io.to(`user_${ownerID}`).emit("cancel_order", {
+        message: `Đơn hàng của bạn đã ${checkOrderIDCancel.orderStatus}`,
+
+        checkOrderIDCancel,
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Hủy order thành công",
+        checkOrderIDCancel,
+      });
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ success: false, message: "Error" });
     }
   },

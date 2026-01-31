@@ -39,6 +39,36 @@ const productControllers = {
       return res.status(500).json({ success: "false", message: "Error" });
     }
   },
+  getProductRelated: async (req, res) => {
+    const productID = req.params.id;
+    try {
+      // lấy sản phẩm hiện tại
+      const product = await Product.findById(productID);
+      if (!product) {
+        return res.status(403).json({
+          success: false,
+          message: "Không tìm thấy sản phẩm",
+        });
+      }
+      const productRelated = await Product.find({
+        productType: product.productType, // lấy theo loại product
+        _id: { $ne: productID }, // loại bỏ sản phẩm chính
+      })
+        .limit(4) // lấy giới hạn 4 sản phẩm
+        .lean({ virtuals: true }); // lấy virtuals (amount, discountedPrice)
+      return res.status(200).json({
+        success: true,
+        message: "Sản phẩm cùng loại",
+        related: productRelated,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server",
+      });
+    }
+  },
 };
 
 module.exports = productControllers;

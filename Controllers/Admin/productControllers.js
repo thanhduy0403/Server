@@ -3,8 +3,16 @@ const User = require("../../model/User");
 const Category = require("../../model/category");
 const productControllers = {
   postProducts: async (req, res) => {
-    const { name, description, price, sizes, stock, discount, categoryID } =
-      req.body;
+    const {
+      name,
+      description,
+      price,
+      sizes,
+      stock,
+      discount,
+      categoryID,
+      productType,
+    } = req.body;
     try {
       if (
         !name ||
@@ -60,6 +68,7 @@ const productControllers = {
         name: name,
         // imageID: req.file.filename,
         image: imageUrl,
+        productType: productType,
         gallery: galleryUrls,
         description: description,
         price: price,
@@ -132,8 +141,16 @@ const productControllers = {
 
   UpdateProduct: async (req, res) => {
     const idProduct = req.params.id;
-    const { name, description, price, sizes, stock, discount, categoryID } =
-      req.body;
+    const {
+      name,
+      description,
+      price,
+      sizes,
+      stock,
+      discount,
+      categoryID,
+      productType,
+    } = req.body;
 
     try {
       // Kiểm tra thông tin bắt buộc
@@ -208,6 +225,7 @@ const productControllers = {
         {
           name: name,
           image: imageUrl,
+          productType: productType,
           gallery: finalGallery,
           description: description,
           price: price,
@@ -251,13 +269,13 @@ const productControllers = {
   DeleteProduct: async (req, res) => {
     const idProduct = req.params.id;
     try {
-      const deleteItem = await Product.findByIdAndDelete(idProduct);
+      const deleteItem = await Product.findById(idProduct);
       if (!deleteItem) {
         return res
           .status(403)
           .json({ success: false, message: "Không tìm thấy sản phẩm" });
       }
-
+      await Product.findByIdAndDelete(idProduct);
       return res
         .status(200)
         .json({ success: true, message: "Xóa sản phẩm thành công" });

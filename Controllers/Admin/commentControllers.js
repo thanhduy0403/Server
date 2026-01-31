@@ -1,5 +1,5 @@
 const Comment = require("../../model/comment");
-
+const { getIO } = require("../../socket");
 const commentControllers = {
   getCommentProduct: async (req, res) => {
     try {
@@ -93,7 +93,7 @@ const commentControllers = {
           .status(403)
           .json({ success: false, message: "Hãy nhập nội dung trả lời" });
       }
-      const comment = await Comment.findById(commentID);
+      const comment = await Comment.findById(commentID).populate("productID");
       // lấy thông tin chi tiết comment hiện có
       if (!comment) {
         return res
@@ -111,7 +111,13 @@ const commentControllers = {
       }
       comment.replies.push(newReply);
       comment.status = "answered";
-
+      const io = getIO();
+      const ownerID = comment.userID;
+      io.to(`user_${ownerID}`).emit("reply_comment", {
+        message: "Phản hồi từ hệ thống",
+        commentId: comment,
+        productId: comment.productID?._id || comment.productID, // ✅ Xử lý cả 2 TH
+      });
       await comment.save();
       return res
         .status(200)
